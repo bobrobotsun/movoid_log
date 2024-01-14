@@ -15,7 +15,10 @@ from typing import List
 
 
 class LogError(Exception):
-    pass
+    def __init__(self, *args, **kwargs):
+        super(LogError, self).__init__(*args)
+        self.args = args
+        self.kwargs = kwargs
 
 
 class LogElement:
@@ -46,6 +49,8 @@ class LogElement:
                 temp_dict['file'] = temp_dict['pathlib'].open(mode='a', encoding='utf8')
                 self.check_new_file(temp_dict)
                 self.__file_list[index] = temp_dict
+            elif callable(one_file):
+                temp_dict['function'] = one_file
 
     def check_new_file(self, file_dict, print_text=''):
         now_day = datetime.datetime.now().strftime("%Y%m%d")
@@ -83,8 +88,11 @@ class LogElement:
         level_text = self.analyse_level(level)
         print_text = f"{time_text} [{level_text}] : {arg_text}"
         for file_dict in self.__file_list:
-            file_dict['file'].write(print_text)
-            file_dict['file'].flush()
+            if 'file' in file_dict:
+                file_dict['file'].write(print_text)
+                file_dict['file'].flush()
+            elif 'function' in file_dict:
+                file_dict['function'](print_text)
         if self.__console:
             if self.__level.index(level_text) >= 3:
                 print_file = sys.stderr
@@ -94,6 +102,17 @@ class LogElement:
             print_file.flush()
         for file_dict in self.__file_list:
             self.check_new_file(file_dict, print_text)
+
+    def warn(self, *args):
+        self.print(*args, level='WARN')
+
+    def error(self, *args, **kwargs):
+        self.print(*args, level='ERROR')
+        raise LogError(*args, **kwargs)
+
+    def critical(self, *args, **kwargs):
+        self.print(*args, level='CRITICAL')
+        raise LogError(*args, **kwargs)
 
 
 class Log:
