@@ -82,7 +82,8 @@ class LogElement:
         else:
             raise LogError(f'unknown leve:<{level}>')
 
-    def print(self, *args, level='INFO', sep=' ', end='\n'):
+    def print(self, *args, level='INFO', sep=' ', end='\n', console=None):
+        console = self.__console if console is None else console
         time_text = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
         arg_text = sep.join([str(_) for _ in args]) + end
         level_text = self.analyse_level(level)
@@ -93,7 +94,7 @@ class LogElement:
                 file_dict['file'].flush()
             elif 'function' in file_dict:
                 file_dict['function'](print_text)
-        if self.__console:
+        if console:
             if self.__level.index(level_text) >= 3:
                 print_file = sys.stderr
             else:
@@ -103,15 +104,15 @@ class LogElement:
         for file_dict in self.__file_list:
             self.check_new_file(file_dict, print_text)
 
-    def warn(self, *args):
-        self.print(*args, level='WARN')
+    def warn(self, *args, console=None):
+        self.print(*args, level='WARN', console=console)
 
-    def error(self, *args, **kwargs):
-        self.print(*args, level='ERROR')
+    def error(self, *args, console=None, **kwargs):
+        self.print(*args, level='ERROR', console=console)
         raise LogError(*args, **kwargs)
 
-    def critical(self, *args, **kwargs):
-        self.print(*args, level='CRITICAL')
+    def critical(self, *args, console=None, **kwargs):
+        self.print(*args, level='CRITICAL', console=console)
         raise LogError(*args, **kwargs)
 
 
