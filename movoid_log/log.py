@@ -10,8 +10,9 @@ import datetime
 import pathlib
 import re
 import sys
-import time
-from typing import List, Dict
+import traceback
+from functools import wraps
+from typing import Dict
 
 from movoid_timer import Timer
 from movoid_timer.timer import TimerElement
@@ -43,7 +44,7 @@ class LogElement:
 
     def init_file_list(self):
         for index, one_file in enumerate(self.__file_list):
-            temp_dict = {}
+            temp_dict: dict = {}
             if isinstance(one_file, str):
                 file_path = pathlib.Path(one_file).resolve()
                 temp_dict['dir'] = file_path.parent
@@ -62,23 +63,24 @@ class LogElement:
         if now_day != c_day or file_dict['pathlib'].stat().st_size > self.__max_size:
             index_list = []
             for i in file_dict['dir'].glob(f"{file_dict['name']}-{c_day}-*.log"):
-                re_result = re.search(f"{file_dict['name']}-{c_day}-(.*)\.log", str(i))
+                re_pattern = rf"{file_dict['name']}-{c_day}-(.*)\.log"
+                re_result = re.search(re_pattern, str(i))
                 try:
                     index_list.append(int(re_result.group(1)))
                 except ValueError:
                     continue
-            index = max(index_list) + 1
+            index = max(index_list) + 1 if index_list else 1
             str_index = '{:0>3d}'.format(index)
             file_name = f"{file_dict['name']}-{c_day}-{str_index}.log"
             new_file_path = file_dict['dir'] / file_name
             file_dict['file'].close()
             file_dict['pathlib'].replace(new_file_path)
             file_dict['pathlib'] = file_dict['dir'] / (file_dict['name'] + '.log')
-            file_dict['file'] = file_dict['pathlib'].open(mode='a', encoding='utf8')
+            file_dict['file'] = file_dict['pathlib'].open(mode='w', encoding='utf8')
             file_dict['file'].write(print_text)
             file_dict['file'].flush()
 
-    def analyse_level(self, level='INFO'):
+    def _analyse_level(self, level='INFO'):
         if isinstance(level, str) and level.upper() in self.__level:
             return level.upper()
         elif isinstance(level, int) and 0 <= level <= len(self.__level):
@@ -89,12 +91,12 @@ class LogElement:
     def print(self, *args, level='INFO', sep=' ', end='\n', console=None):
         console = self.__console if console is None else console
         time_text = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        arg_text = sep.join([str(_) for _ in args]) + end
-        level_text = self.analyse_level(level)
+        arg_text = sep.join([str(_) for _ in args])
+        level_text = self._analyse_level(level)
         timer_text = ''
         if self.__timer:
             timer_text = ' [' + ' | '.join([f"{_i} {_v.now_format(2)}" for _i, _v in self.__timer.items()]) + ']'
-        print_text = f"{time_text} [{level_text}]{timer_text} : {arg_text}"
+        print_text = f"{time_text} [{level_text}]{timer_text} : {arg_text}{end}"
         for file_dict in self.__file_list:
             if 'file' in file_dict:
                 file_dict['file'].write(print_text)
@@ -110,6 +112,17 @@ class LogElement:
             print_file.flush()
         for file_dict in self.__file_list:
             self.check_new_file(file_dict, print_text)
+        return print_text
+
+    def input(self, input_text):
+        input_text = str(input_text)
+        full_input_text = self.print(input_text, console=False).rstrip('\n')
+        get_input_text = input(full_input_text)
+        self.print(f'you input <{get_input_text}>')
+        return get_input_text
+
+    def debug(self, *args, console=None):
+        self.print(*args, level='DEBUG', console=console)
 
     def warn(self, *args, console=None):
         self.print(*args, level='WARN', console=console)
@@ -131,20 +144,141 @@ class LogElement:
         self.__timer[key].delete()
         self.__timer.pop(key)
 
+    def function_mark(self, operate_text=None, timer=None, error_traceback=True, error_raise=True, level='INFO', console=None):
+        if timer is True:
+            timer = operate_text
+        if operate_text is not None:
+            start_text = Log.mark_format['start'].format(operate_text=operate_text)
+            error_text = Log.mark_format['error'].format(operate_text=operate_text)
+            end_text = Log.mark_format['end'].format(operate_text=operate_text)
+        else:
+            error_text = ''
+
+        def dec(func):
+            @wraps(func)
+            def wrapping(*args, **kwargs):
+                if timer is not None:
+                    self.timer(timer)
+                if operate_text is not None:
+                    self.print(start_text, level=level, console=console)
+                try:
+                    re_value = func(*args, **kwargs)
+                except Exception as err:
+                    traceback_text = ''
+                    if error_traceback:
+                        traceback_text = ':' + traceback.format_exc()
+                    full_error_text = f'{error_text}{traceback_text}'
+                    if full_error_text:
+                        self.print(full_error_text, level='error', console=console)
+                    if error_raise:
+                        raise err
+                else:
+                    return re_value
+                finally:
+                    if operate_text is not None:
+                        self.print(end_text, level=level, console=console)
+                    if timer is not None:
+                        self.timer_delete(timer)
+
+            return wrapping
+
+        return dec
+
 
 class Log:
     __log = {}
 
+    language = 'chinese'
+    mark_format = {
+        'start': 'start to <{operate_text}>',
+        'end': 'end to <{operate_text}>',
+        'error': '<{operate_text}>interrupted, something error happened',
+    }
+
     def __new__(cls, key="__default__", *args, console: bool = True, max_size=33554432) -> LogElement:
-        cls.__log[key] = LogElement(key, *args, console=console, max_size=max_size)
+        if key not in cls.__log:
+            cls.__log[key] = LogElement(key, *args, console=console, max_size=max_size)
         return cls.__log[key]
 
     @classmethod
     def get(cls, item, *args):
         return cls.__log.get(item, *args)
 
+    @classmethod
+    def function_mark(cls, operate_text=None, timer=None, error_traceback=True, error_raise=True, level='INFO', console=None):
+        if timer is True:
+            timer = operate_text
+        if operate_text is not None:
+            start_text = cls.mark_format['start'].format(operate_text=operate_text)
+            error_text = cls.mark_format['error'].format(operate_text=operate_text)
+            end_text = cls.mark_format['end'].format(operate_text=operate_text)
+        else:
+            error_text = ''
 
-if __name__ == '__main__':
-    log = Log('test', 'test/test_log', max_size=100)
-    for i in range(10):
-        log.print('1' * 20)
+        def dec(func):
+            @wraps(func)
+            def wrapping(self, *args, **kwargs):
+                if timer is not None:
+                    self.timer(timer)
+                if operate_text is not None:
+                    self.print(start_text, level=level, console=console)
+                try:
+                    re_value = func(self, *args, **kwargs)
+                except Exception as err:
+                    traceback_text = ''
+                    if error_traceback:
+                        traceback_text = ':' + traceback.format_exc()
+                    full_error_text = f'{error_text}{traceback_text}'
+                    if full_error_text:
+                        self.print(full_error_text, level='error', console=console)
+                    if error_raise:
+                        raise err
+                else:
+                    return re_value
+                finally:
+                    if operate_text is not None:
+                        self.print(end_text, level=level, console=console)
+                    if timer is not None:
+                        self.timer_delete(timer)
+
+            return wrapping
+
+        return dec
+
+
+class LogSub:
+    @property
+    def log(self) -> LogElement:
+        return Log('__default')
+
+    @property
+    def print(self):
+        return self.log.print
+
+    @property
+    def input(self):
+        return self.log.input
+
+    @property
+    def debug(self):
+        return self.log.debug
+
+    @property
+    def warn(self):
+        return self.log.warn
+
+    @property
+    def error(self):
+        return self.log.error
+
+    @property
+    def critical(self):
+        return self.log.critical
+
+    @property
+    def timer(self):
+        return self.log.timer
+
+    @property
+    def timer_delete(self):
+        return self.log.timer_delete
