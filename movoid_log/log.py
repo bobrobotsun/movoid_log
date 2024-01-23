@@ -40,9 +40,10 @@ class LogElement:
         self.__file_list = list(args)
         self.__max_size = int(max_size)
         self.__timer: Dict[str, TimerElement] = {}
-        self.init_file_list()
+        self.__timer_print = {}
+        self.__init_file_list()
 
-    def init_file_list(self):
+    def __init_file_list(self):
         for index, one_file in enumerate(self.__file_list):
             temp_dict: dict = {}
             if isinstance(one_file, str):
@@ -52,12 +53,12 @@ class LogElement:
                 temp_dict['name'] = file_path.stem
                 temp_dict['pathlib'] = temp_dict['dir'] / (temp_dict['name'] + '.log')
                 temp_dict['file'] = temp_dict['pathlib'].open(mode='a', encoding='utf8')
-                self.check_new_file(temp_dict)
+                self.__check_new_file(temp_dict)
                 self.__file_list[index] = temp_dict
             elif callable(one_file):
                 temp_dict['function'] = one_file
 
-    def check_new_file(self, file_dict, print_text=''):
+    def __check_new_file(self, file_dict, print_text=''):
         now_day = datetime.datetime.now().strftime("%Y%m%d")
         c_day = datetime.datetime.fromtimestamp(file_dict['pathlib'].stat().st_ctime).strftime("%Y%m%d")
         if now_day != c_day or file_dict['pathlib'].stat().st_size > self.__max_size:
@@ -69,14 +70,15 @@ class LogElement:
                     index_list.append(int(re_result.group(1)))
                 except ValueError:
                     continue
-            index = max(index_list) + 1 if index_list else 1
+            index = max(index_list) + 1 if index_list else 0
             str_index = '{:0>3d}'.format(index)
             file_name = f"{file_dict['name']}-{c_day}-{str_index}.log"
             new_file_path = file_dict['dir'] / file_name
             file_dict['file'].close()
-            file_dict['pathlib'].replace(new_file_path)
+            file_dict['pathlib'].rename(new_file_path)
             file_dict['pathlib'] = file_dict['dir'] / (file_dict['name'] + '.log')
-            file_dict['file'] = file_dict['pathlib'].open(mode='w', encoding='utf8')
+            file_dict['pathlib'].unlink()
+            file_dict['file'] = file_dict['pathlib'].open(mode='w+', encoding='utf8')
             file_dict['file'].write(print_text)
             file_dict['file'].flush()
 
@@ -95,7 +97,7 @@ class LogElement:
         level_text = self._analyse_level(level)
         timer_text = ''
         if self.__timer:
-            timer_text = ' [' + ' | '.join([f"{_i} {_v.now_format(2)}" for _i, _v in self.__timer.items()]) + ']'
+            timer_text = ' [' + ' | '.join([f"{_i} {self.__timer[_i].now_format(2)}" for _i in self.__timer_print]) + ']'
         print_text = f"{time_text} [{level_text}]{timer_text} : {arg_text}{end}"
         for file_dict in self.__file_list:
             if 'file' in file_dict:
@@ -111,7 +113,7 @@ class LogElement:
             print_file.write(print_text)
             print_file.flush()
         for file_dict in self.__file_list:
-            self.check_new_file(file_dict, print_text)
+            self.__check_new_file(file_dict, print_text)
         return print_text
 
     def input(self, input_text):
@@ -135,14 +137,18 @@ class LogElement:
         self.print(*args, level='CRITICAL', console=console)
         raise LogError(*args, **kwargs)
 
-    def timer(self, key) -> TimerElement:
+    def timer(self, key, print_it=True) -> TimerElement:
         if key not in self.__timer:
             self.__timer[key] = Timer(f'-{self.__key}-{key}')
+            if print_it:
+                self.__timer_print[key] = True
         return self.__timer[key]
 
     def timer_delete(self, key):
         self.__timer[key].delete()
         self.__timer.pop(key)
+        if key in self.__timer_print:
+            self.__timer_print.pop(key)
 
     def function_mark(self, operate_text=None, timer=None, error_traceback=True, error_raise=True, level='INFO', console=None):
         if timer is True:
@@ -187,8 +193,6 @@ class LogElement:
 
 class Log:
     __log = {}
-
-    language = 'chinese'
     mark_format = {
         'start': 'start to <{operate_text}>',
         'end': 'end to <{operate_text}>',
@@ -249,7 +253,7 @@ class Log:
 class LogSub:
     @property
     def log(self) -> LogElement:
-        return Log('__default')
+        return self.__log
 
     @property
     def print(self):
