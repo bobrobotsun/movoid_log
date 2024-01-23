@@ -10,6 +10,7 @@ import datetime
 import pathlib
 import re
 import sys
+import time
 import traceback
 from functools import wraps
 from typing import Dict
@@ -34,11 +35,13 @@ class LogElement:
         'CRITICAL',
     ]
 
-    def __init__(self, key: str, *args, console: bool = True, max_size=33554432):
+    def __init__(self, key: str, *args, console: bool = True, max_size=None, max_day=None, max_file=None):
         self.__key = str(key)
         self.__console = bool(console)
         self.__file_list = list(args)
-        self.__max_size = int(max_size)
+        self.__max_size = 33554432 if max_size is None else int(max_size)
+        self.__max_day = None if max_day is None else float(max_day)
+        self.__max_file = None if max_file is None else int(max_file)
         self.__timer: Dict[str, TimerElement] = {}
         self.__timer_print = {}
         self.__init_file_list()
@@ -58,7 +61,7 @@ class LogElement:
             elif callable(one_file):
                 temp_dict['function'] = one_file
 
-    def __check_new_file(self, file_dict, print_text=''):
+    def __check_new_file(self, file_dict):
         now_day = datetime.datetime.now().strftime("%Y%m%d")
         c_day = datetime.datetime.fromtimestamp(file_dict['pathlib'].stat().st_ctime).strftime("%Y%m%d")
         if now_day != c_day or file_dict['pathlib'].stat().st_size > self.__max_size:
@@ -77,10 +80,25 @@ class LogElement:
             file_dict['file'].close()
             file_dict['pathlib'].rename(new_file_path)
             file_dict['pathlib'] = file_dict['dir'] / (file_dict['name'] + '.log')
-            file_dict['pathlib'].unlink()
+            if file_dict['pathlib'].exists():
+                file_dict['pathlib'].unlink()
             file_dict['file'] = file_dict['pathlib'].open(mode='w+', encoding='utf8')
-            file_dict['file'].write(print_text)
-            file_dict['file'].flush()
+            self.__check_delete_file(file_dict)
+
+    def __check_delete_file(self, file_dict):
+        now_time = time.time()
+        exist_file = {}
+        for i in file_dict['dir'].glob(f"{file_dict['name']}-????????-*.log"):
+            file_time = i.stat().st_mtime
+            if self.__max_day is not None and now_time - file_time > self.__max_day * 86400:
+                i.unlink()
+            else:
+                exist_file[file_time] = i
+        if self.__max_file is not None and len(exist_file) > self.__max_file:
+            file_time_list = list(exist_file.keys())
+            file_time_list.sort(reverse=True)
+            for i in file_time_list[self.__max_file:]:
+                exist_file[i].unlink()
 
     def _analyse_level(self, level='INFO'):
         if isinstance(level, str) and level.upper() in self.__level:
@@ -99,12 +117,6 @@ class LogElement:
         if self.__timer:
             timer_text = ' [' + ' | '.join([f"{_i} {self.__timer[_i].now_format(2)}" for _i in self.__timer_print]) + ']'
         print_text = f"{time_text} [{level_text}]{timer_text} : {arg_text}{end}"
-        for file_dict in self.__file_list:
-            if 'file' in file_dict:
-                file_dict['file'].write(print_text)
-                file_dict['file'].flush()
-            elif 'function' in file_dict:
-                file_dict['function'](print_text)
         if console:
             if self.__level.index(level_text) >= 3:
                 print_file = sys.stderr
@@ -113,7 +125,12 @@ class LogElement:
             print_file.write(print_text)
             print_file.flush()
         for file_dict in self.__file_list:
-            self.__check_new_file(file_dict, print_text)
+            if 'file' in file_dict:
+                self.__check_new_file(file_dict)
+                file_dict['file'].write(print_text)
+                file_dict['file'].flush()
+            if 'function' in file_dict:
+                file_dict['function'](print_text)
         return print_text
 
     def input(self, input_text):
@@ -199,9 +216,9 @@ class Log:
         'error': '<{operate_text}>interrupted, something error happened',
     }
 
-    def __new__(cls, key="__default__", *args, console: bool = True, max_size=33554432) -> LogElement:
+    def __new__(cls, key="__default__", *args, console: bool = True, max_size=None, max_day=None, max_file=None) -> LogElement:
         if key not in cls.__log:
-            cls.__log[key] = LogElement(key, *args, console=console, max_size=max_size)
+            cls.__log[key] = LogElement(key, *args, console=console, max_size=max_size, max_day=max_day, max_file=max_file)
         return cls.__log[key]
 
     @classmethod
