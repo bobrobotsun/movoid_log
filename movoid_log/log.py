@@ -55,6 +55,7 @@ class LogElement:
                 temp_dict['dir'].mkdir(parents=True, exist_ok=True)
                 temp_dict['name'] = file_path.stem
                 temp_dict['pathlib'] = temp_dict['dir'] / (temp_dict['name'] + '.log')
+                temp_dict['pathlib'].touch()
                 temp_dict['file'] = temp_dict['pathlib'].open(mode='a', encoding='utf8')
                 self.__check_new_file(temp_dict)
                 self.__file_list[index] = temp_dict
@@ -80,8 +81,7 @@ class LogElement:
             file_dict['file'].close()
             file_dict['pathlib'].rename(new_file_path)
             file_dict['pathlib'] = file_dict['dir'] / (file_dict['name'] + '.log')
-            if file_dict['pathlib'].exists():
-                file_dict['pathlib'].unlink()
+            file_dict['pathlib'].unlink(missing_ok=True)
             file_dict['file'] = file_dict['pathlib'].open(mode='w+', encoding='utf8')
             self.__check_delete_file(file_dict)
 
@@ -270,7 +270,7 @@ class Log:
 class LogSub:
     @property
     def log(self) -> LogElement:
-        return self.__log
+        return Log('__default')
 
     @property
     def print(self):
