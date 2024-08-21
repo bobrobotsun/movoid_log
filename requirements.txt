@@ -1,2 +1,5 @@
 twine
 build
+pytest
+pytest-html
+movoid_timer
