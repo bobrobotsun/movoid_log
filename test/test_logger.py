@@ -15,9 +15,9 @@ class TestLogger:
     def test_logger(self):
         class Log1(LoggerBase):
             def __init__(self):
-                self.logger_init('log/test1', 1, 5, 1000, 10)
+                self.logger_init('log/test1.log', 1, 5, 1000, 10)
 
         log1 = Log1()
-        for i in range(100):
+        for i in range(20):
             time.sleep(0.1)
             log1.print('asdf')

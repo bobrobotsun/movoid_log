@@ -18,16 +18,19 @@ from logging.handlers import BaseRotatingHandler
 
 class TimeSizeRotatingFileHandler(BaseRotatingHandler):
     def __init__(self, filename, interval: Union[str, int] = 1, max_time=7, max_byte=0, max_file=0, encoding=None, delay=False, at_time=0):
-        filename = str(pathlib.Path(filename).with_suffix('.log'))
+        file_path = pathlib.Path(filename).with_suffix('.log')
+        filename = str(file_path)
+        self.base_path = pathlib.Path(file_path).resolve()
+        self.base_dir = self.base_path.parent
+        if not self.base_dir.exists():
+            self.base_dir.mkdir(parents=True, exist_ok=True)
+        if not self.base_path.exists():
+            self.base_path.touch()
         super().__init__(filename=filename, mode='a', encoding=encoding, delay=delay)
         self.at_time = int(at_time)
         self.max_time = int(max_time)
         self.max_byte = int(max_byte)
         self.max_file = int(max_file)
-        self.base_path = pathlib.Path(self.baseFilename).resolve()
-        self.base_dir = self.base_path.parent
-        if not self.base_dir.exists():
-            self.base_dir.mkdir(parents=True, exist_ok=True)
         if isinstance(interval, str):
             interval = interval.lower()
             if interval.endswith('s'):
@@ -77,6 +80,10 @@ class TimeSizeRotatingFileHandler(BaseRotatingHandler):
         else:
             t = int(time.time())
         self.roll_over_at = self.calculate_roll_over(t)
+
+    def _open(self):
+        self.base_path.touch(exist_ok=True)
+        return super()._open()
 
     def calculate_roll_over(self, target_time):
         return (target_time + self.interval - self.at_time) // self.interval * self.interval + self.at_time
