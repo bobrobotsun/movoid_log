@@ -7,6 +7,4 @@
 # Description   : 
 """
 from .log import Log, LogSub, LogElement, LogError
-
-if __name__ == '__main__':
-    pass
+from .logger import LoggerBase, TimeSizeRotatingFileHandler
