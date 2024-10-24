@@ -76,7 +76,7 @@ class TimeSizeRotatingFileHandler(BaseRotatingHandler):
         self.extMatch = re.compile(self.extMatch, re.ASCII)
         filename = self.baseFilename
         if os.path.exists(filename):
-            t = os.stat(filename)[ST_CTIME]
+            t = os.stat(filename)[ST_MTIME]
         else:
             t = int(time.time())
         self.roll_over_at = self.calculate_roll_over(t)
@@ -110,7 +110,7 @@ class TimeSizeRotatingFileHandler(BaseRotatingHandler):
         if self.max_file > 0:
             file_list = list(self.base_dir.glob(f'{self.base_path.stem}.*.log'))
             if len(file_list) >= self.max_file:
-                file_sorted = sorted(file_list, key=lambda p: os.stat(str(p))[ST_CTIME], reverse=True)
+                file_sorted = sorted(file_list, key=lambda p: os.stat(str(p))[ST_MTIME], reverse=True)
                 for i in file_sorted[self.max_file - 1:]:
                     i.unlink()
 
