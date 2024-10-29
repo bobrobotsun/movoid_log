@@ -2,4 +2,5 @@ twine
 build
 pytest
 pytest-html
+movoid_function
 movoid_timer

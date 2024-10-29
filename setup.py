@@ -14,5 +14,8 @@ setup(
     description='create log',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    install_requires=['movoid_timer'],
+    install_requires=[
+        'movoid_function',
+        'movoid_timer',
+    ],
 )

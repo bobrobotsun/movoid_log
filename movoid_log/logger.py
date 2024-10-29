@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import time
+from movoid_function import wraps
 from stat import ST_MTIME, ST_CTIME
 from typing import Union
 from logging.handlers import BaseRotatingHandler
@@ -206,3 +207,65 @@ class LoggerBase:
     def critical(self, *args, sep=' ', exc_info=True, **kwargs):
         kwargs.setdefault('stacklevel', 3)
         self.print(*args, sep=sep, level=logging.CRITICAL, exc_info=exc_info, **kwargs)
+
+
+LOG_PRINT_FORMAT = '>{value}<({type})'
+
+
+def analyse_value(value):
+    value_class = type(value).__name__
+    return LOG_PRINT_FORMAT.format(value=str(value), type=value_class)
+
+
+def analyse_input_value(args, kwargs, print_bool):
+    re_str = ''
+    if print_bool:
+        temp_str = ' , '.join([analyse_value(_) for _ in args] + [f'{_k}={analyse_value(_v)}' for _k, _v in kwargs.items()])
+        if isinstance(print_bool, int):
+            print_len = max(4, print_bool)
+            re_str = ' input is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
+    return re_str
+
+
+def analyse_return_value(re_value, print_bool):
+    re_str = ''
+    if print_bool:
+        if isinstance(re_value, tuple):
+            temp_str = ' , '.join([analyse_value(_) for _ in re_value])
+        else:
+            temp_str = analyse_value(re_value)
+        if isinstance(print_bool, int):
+            print_len = max(4, print_bool)
+            re_str = ' return is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
+    return re_str
+
+
+def function_log(process: bool = True, input_value: Union[bool, int] = True, return_value: Union[bool, int] = True):
+    """
+    装饰器将当前函数运行时的内容，简单打印在日志里
+    :param process: 开始和结束运行时，需要打印日志
+    :param input_value: 开始时，是否将当前详细的输入值打印在日志中。如果输入数值，那么将会把文字缩减至相应长度，最少显示4位
+    :param return_value: 结束后，是否将返回值打印在日志中。如果输入数值，那么将会把文字缩减至相应长度，最少显示4位
+    """
+    if callable(process):
+        # 如果只把装饰器当一层装饰器用，仍旧能生效
+        return function_log()(process)
+
+    def dec(func):
+        @wraps(func)
+        def wrapper(self: LoggerBase, *args, **kwargs):
+            start_time = time.time()
+            if process:
+                self.print(f'{func.__name__} start.{analyse_input_value(args, kwargs, input_value)}')
+            try:
+                re_value = func(self, *args, **kwargs)
+            except Exception as err:
+                self.error(f'{err}<< occurs when {func.__name__} running and cost {time.time() - start_time:.3f}s.')
+                raise err
+            else:
+                if process:
+                    self.print(f'{func.__name__} end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}')
+
+        return wrapper
+
+    return dec
