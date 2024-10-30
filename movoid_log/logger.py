@@ -156,7 +156,8 @@ class LoggerBase:
     继承该类时，需要调用logger_init这个函数。
     """
 
-    def logger_init(self, file_name, interval: Union[str, int] = 0, max_time=0, max_byte=0, max_file=0, console=True):
+    def logger_init(self, file_name, interval: Union[str, int] = 0, max_time=0, max_byte=0, max_file=0, console=True,
+                    formatter='%(asctime)s-%(name)s-%(filename)s-[line:%(lineno)d]-%(levelname)s: %(message)s'):
         """
         创建一个可以直接按照文件和日期来拆分的日志系统
         :param file_name: 文件的名称，不需要后缀
@@ -170,9 +171,10 @@ class LoggerBase:
         :param max_byte: 一个文件支持的最大大小。默认为0时，无论文件多大都不分文件
         :param max_file: 对多支持多少个log分文件。默认为0时，无论多少文件都不删除
         :param console: 是否在std上打印
+        :param formatter: 打印格式
         """
         self._logger = logging.Logger(pathlib.Path(file_name).stem)
-        log_format = logging.Formatter('%(asctime)s-%(name)s-%(filename)s-[line:%(lineno)d]-%(levelname)s: %(message)s')
+        log_format = logging.Formatter(formatter) if isinstance(formatter, str) else formatter
         time_handler = TimeSizeRotatingFileHandler(file_name, interval=interval, max_time=max_time, max_byte=max_byte, max_file=max_file)
         time_handler.setFormatter(log_format)
         self._logger.addHandler(time_handler)
