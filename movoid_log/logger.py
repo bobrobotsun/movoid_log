@@ -156,6 +156,7 @@ class LoggerBase:
     这个类会使用_logger这个变量来作为基础logging.logger，因此需要注意不要重名
     继承该类时，需要调用logger_init这个函数。
     """
+    _logger_instance = {}
 
     def logger_init(self, file_name, interval: Union[str, int] = 0, max_time=0, max_byte=0, max_file=0, console=True, encoding='utf8',
                     formatter='%(asctime)s %(name)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s'):
@@ -175,42 +176,66 @@ class LoggerBase:
         :param encoding: 打印格式
         :param formatter: 可以输入字符串，也可以直接传入 logging.Formatter
         """
-        self._logger = logging.Logger(pathlib.Path(file_name).stem)
-        log_format = logging.Formatter(formatter) if isinstance(formatter, str) else formatter
-        time_handler = TimeSizeRotatingFileHandler(file_name, interval=interval, max_time=max_time, max_byte=max_byte, max_file=max_file, encoding=encoding)
-        time_handler.setFormatter(log_format)
-        self._logger.addHandler(time_handler)
-        if console:
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(log_format)
-            console_handler.setLevel(logging.INFO)
-            self._logger.addHandler(console_handler)
+        name = pathlib.Path(file_name).stem
+        if name in self._logger_instance:
+            self._logger = self._logger_instance[name]
+        else:
+            self._logger = logging.Logger(name)
+            self._logger_instance[name] = self
+            log_format = logging.Formatter(formatter) if isinstance(formatter, str) else formatter
+            time_handler = TimeSizeRotatingFileHandler(file_name, interval=interval, max_time=max_time, max_byte=max_byte, max_file=max_file, encoding=encoding)
+            time_handler.setFormatter(log_format)
+            self._logger.addHandler(time_handler)
+            if console:
+                console_handler = logging.StreamHandler()
+                console_handler.setFormatter(log_format)
+                console_handler.setLevel(logging.INFO)
+                self._logger.addHandler(console_handler)
 
     def print(self, *args, sep=' ', level: Union[str, int] = 'INFO', exc_info=False, **kwargs):
         print_text = str(sep).join([str(_) for _ in args])
         level_int = logging._nameToLevel.get(level, logging.INFO) if isinstance(level, str) else int(level)
-        kwargs.setdefault('stacklevel', 2)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 2
+        kwargs['stacklevel'] = stack_level
         self._logger.log(level=level_int, msg=print_text, exc_info=exc_info, **kwargs)
 
     def debug(self, *args, sep=' ', exc_info=False, **kwargs):
-        kwargs.setdefault('stacklevel', 3)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 1
+        kwargs['stacklevel'] = stack_level
         self.print(*args, sep=sep, level=logging.DEBUG, exc_info=exc_info, **kwargs)
 
     def info(self, *args, sep=' ', exc_info=False, **kwargs):
-        kwargs.setdefault('stacklevel', 3)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 1
+        kwargs['stacklevel'] = stack_level
         self.print(*args, sep=sep, level=logging.INFO, exc_info=exc_info, **kwargs)
 
     def warn(self, *args, sep=' ', exc_info=False, **kwargs):
-        kwargs.setdefault('stacklevel', 3)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 1
+        kwargs['stacklevel'] = stack_level
         self.print(*args, sep=sep, level=logging.WARNING, exc_info=exc_info, **kwargs)
 
     def error(self, *args, sep=' ', exc_info=True, **kwargs):
-        kwargs.setdefault('stacklevel', 3)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 1
+        kwargs['stacklevel'] = stack_level
         self.print(*args, sep=sep, level=logging.ERROR, exc_info=exc_info, **kwargs)
 
     def critical(self, *args, sep=' ', exc_info=True, **kwargs):
-        kwargs.setdefault('stacklevel', 3)
+        stack_level = kwargs.get('stacklevel', 0)
+        stack_level += 1
+        kwargs['stacklevel'] = stack_level
         self.print(*args, sep=sep, level=logging.CRITICAL, exc_info=exc_info, **kwargs)
+
+    @classmethod
+    def __class_getitem__(cls, item):
+        if item in cls._logger_instance:
+            return cls._logger_instance[item]
+        else:
+            raise KeyError(f'there is no logger "{item}" yet.')
 
 
 LOG_PRINT_FORMAT = '>{value}<({type})'
@@ -260,15 +285,15 @@ def function_log(process: bool = True, input_value: Union[bool, int] = True, ret
         def wrapper(self: LoggerBase, *args, **kwargs):
             start_time = time.time()
             if process:
-                self.print(f'{func.__name__} start.{analyse_input_value(args, kwargs, input_value)}')
+                self.print(f'[{func.__name__}] start.{analyse_input_value(args, kwargs, input_value)}')
             try:
                 re_value = func(self, *args, **kwargs)
             except Exception as err:
-                self.error(f'{err}<< occurs when {func.__name__} running and cost {time.time() - start_time:.3f}s.')
+                self.error(f'{err}<< occurs when [{func.__name__}] running and cost {time.time() - start_time:.3f}s.')
                 raise err
             else:
                 if process:
-                    self.print(f'{func.__name__} end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}')
+                    self.print(f'[{func.__name__}] end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}')
 
         return wrapper
 
