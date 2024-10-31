@@ -239,7 +239,7 @@ class LoggerBase:
             raise KeyError(f'there is no logger "{item}" yet.')
 
 
-LOG_PRINT_FORMAT = '>{value}<({type})'
+LOG_PRINT_FORMAT = '{value}({type})'
 
 
 def analyse_value(value):
