@@ -5,7 +5,7 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setup(
     name='movoid_log',
-    version='1.2.1',
+    version='1.2.1.9',
     packages=find_packages(),
     url='',
     license='',
@@ -14,5 +14,8 @@ setup(
     description='create log',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    install_requires=['movoid_timer'],
+    install_requires=[
+        'movoid_function',
+        'movoid_timer',
+    ],
 )
