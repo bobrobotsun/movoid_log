@@ -5,7 +5,7 @@ with open("README.md", "r", encoding='utf-8') as fh:
 
 setup(
     name='movoid_log',
-    version='1.2.1.6',
+    version='1.2.1.8',
     packages=find_packages(),
     url='',
     license='',

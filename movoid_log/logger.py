@@ -7,6 +7,7 @@
 # Description   : 
 """
 import logging
+import math
 import os
 import pathlib
 import re
@@ -250,9 +251,11 @@ def analyse_input_value(args, kwargs, print_bool):
     re_str = ''
     if print_bool:
         temp_str = ' , '.join([analyse_value(_) for _ in args] + [f'{_k}={analyse_value(_v)}' for _k, _v in kwargs.items()])
-        if isinstance(print_bool, int):
+        if isinstance(print_bool, bool):
+            print_len = math.inf
+        else:
             print_len = max(4, print_bool)
-            re_str = ' input is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
+        re_str = ' input is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
     return re_str
 
 
@@ -263,9 +266,11 @@ def analyse_return_value(re_value, print_bool):
             temp_str = ' , '.join([analyse_value(_) for _ in re_value])
         else:
             temp_str = analyse_value(re_value)
-        if isinstance(print_bool, int):
+        if isinstance(print_bool, bool):
+            print_len = math.inf
+        else:
             print_len = max(4, print_bool)
-            re_str = ' return is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
+        re_str = ' return is:' + (temp_str if len(temp_str) < print_len else (temp_str[:print_len - 3] + '...'))
     return re_str
 
 
@@ -294,6 +299,7 @@ def function_log(process: bool = True, input_value: Union[bool, int] = True, ret
             else:
                 if process:
                     self.print(f'[{func.__name__}] end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}')
+                return re_value
 
         return wrapper
 
