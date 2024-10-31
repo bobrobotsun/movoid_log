@@ -12,8 +12,8 @@ import os
 import pathlib
 import re
 import time
-from movoid_function import wraps
-from stat import ST_MTIME, ST_CTIME
+from movoid_function import wraps, analyse_args_value_from_function
+from stat import ST_MTIME
 from typing import Union
 from logging.handlers import BaseRotatingHandler
 
@@ -247,10 +247,17 @@ def analyse_value(value):
     return LOG_PRINT_FORMAT.format(value=str(value), type=value_class)
 
 
-def analyse_input_value(args, kwargs, print_bool):
+def analyse_input_value(func, self, args, kwargs, print_bool):
     re_str = ''
     if print_bool:
-        temp_str = ' , '.join([analyse_value(_) for _ in args] + [f'{_k}={analyse_value(_v)}' for _k, _v in kwargs.items()])
+        arg_value = analyse_args_value_from_function(func, self, *args, **kwargs)
+        arg_list = [f'{_k}={analyse_value(_v)}' for _k, _v in arg_value['arg'].items() if _k != 'self']
+        if 'args' in arg_value:
+            arg_list += [f'*{_k}::' + ' , '.join([analyse_value(_w) for _w in _v]) for _k, _v in arg_value['args'].items()]
+        arg_list += [f'{_k}={analyse_value(_v)}' for _k, _v in arg_value['kwarg'].items()]
+        if 'kwargs' in arg_value:
+            arg_list += [f'*{_k}::' + ' , '.join([f'{_l}={analyse_value(_w)}' for _l, _w in _v.items()]) for _k, _v in arg_value['kwargs'].items()]
+        temp_str = ' , '.join(arg_list)
         if isinstance(print_bool, bool):
             print_len = math.inf
         else:
@@ -290,7 +297,7 @@ def function_log(process: bool = True, input_value: Union[bool, int] = True, ret
         def wrapper(self: LoggerBase, *args, **kwargs):
             start_time = time.time()
             if process:
-                self.print(f'[{func.__name__}] start.{analyse_input_value(args, kwargs, input_value)}')
+                self.print(f'[{func.__name__}] start.{analyse_input_value(func, self, args, kwargs, input_value)}')
             try:
                 re_value = func(self, *args, **kwargs)
             except Exception as err:
