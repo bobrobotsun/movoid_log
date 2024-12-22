@@ -6,5 +6,5 @@
 # Time          : 2024/1/11 22:52
 # Description   : 
 """
-from .log import Log, LogSub, LogElement, LogError
+from .log_old import Log, LogSub, LogElement, LogError
 from .logger import LoggerBase, TimeSizeRotatingFileHandler, function_log, LOG_PRINT_FORMAT

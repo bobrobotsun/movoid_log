@@ -3,12 +3,14 @@
 """
 # File          : test_log
 # Author        : Sun YiFan-Movoid
-# Time          : 2024/8/22 0:44
+# Time          : 2024/12/22 20:53
 # Description   : 
 """
-from movoid_log import Log
+from movoid_log.log import LogWrite
 
 
-class TestLog:
+class Test_Log:
     def test_log(self):
-        log = Log()
+        log = LogWrite()
+        log.log(1, 2, 3, 4, 5)
+        log.log(1, 2, 3, 4, 5)
