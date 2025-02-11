@@ -19,7 +19,7 @@ from logging.handlers import BaseRotatingHandler
 
 
 class TimeSizeRotatingFileHandler(BaseRotatingHandler):
-    def __init__(self, filename, interval: Union[str, int] = 1, max_time=7, max_byte=0, max_file=0, encoding='utf8', delay=False, at_time=0):
+    def __init__(self, filename, interval: Union[str, int] = '1d', max_time=7, max_byte=0, max_file=0, encoding='utf8', delay=False, at_time=0):
         file_path = pathlib.Path(filename).with_suffix('.log')
         filename = str(file_path)
         self.base_path = pathlib.Path(file_path).resolve()
@@ -159,7 +159,7 @@ class LoggerBase:
     """
     _logger_instance = {}
 
-    def logger_init(self, file_name, interval: Union[str, int] = 0, max_time=0, max_byte=0, max_file=0, console=True, encoding='utf8',
+    def logger_init(self, file_name, interval: Union[str, int] = '1d', max_time=0, max_byte=0, max_file=0, console=True, encoding='utf8',
                     formatter='%(asctime)s %(name)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s'):
         """
         创建一个可以直接按照文件和日期来拆分的日志系统
@@ -297,15 +297,15 @@ def function_log(process: bool = True, input_value: Union[bool, int] = True, ret
         def wrapper(self: LoggerBase, *args, **kwargs):
             start_time = time.time()
             if process:
-                self.print(f'[{func.__name__}] start.{analyse_input_value(func, self, args, kwargs, input_value)}')
+                self.print(f'[{func.__name__}] start.{analyse_input_value(func, self, args, kwargs, input_value)}', stacklevel=2)
             try:
                 re_value = func(self, *args, **kwargs)
             except Exception as err:
-                self.error(f'{err}<< occurs when [{func.__name__}] running and cost {time.time() - start_time:.3f}s.')
+                self.error(f'{err}<< occurs when [{func.__name__}] running and cost {time.time() - start_time:.3f}s.', stacklevel=2)
                 raise err
             else:
                 if process:
-                    self.print(f'[{func.__name__}] end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}')
+                    self.print(f'[{func.__name__}] end and cost {time.time() - start_time:.3f}s.{analyse_return_value(re_value, return_value)}', stacklevel=2)
                 return re_value
 
         return wrapper
