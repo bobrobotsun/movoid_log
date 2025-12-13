@@ -6,15 +6,16 @@
 # Time          : 2024/10/19 21:14
 # Description   : 
 """
+import inspect
 import logging
 import math
 import os
 import pathlib
 import re
 import time
-from movoid_function import wraps, analyse_args_value_from_function
+from movoid_function import wraps, analyse_args_value_from_function, STACK
 from stat import ST_MTIME
-from typing import Union
+from typing import Union, Dict
 from logging.handlers import BaseRotatingHandler
 
 
@@ -157,9 +158,9 @@ class LoggerBase:
     这个类会使用_logger这个变量来作为基础logging.logger，因此需要注意不要重名
     继承该类时，需要调用logger_init这个函数。
     """
-    _logger_instance = {}
+    _logger_instance: Dict[str, logging.Logger] = {}
 
-    def logger_init(self, file_name, interval: Union[str, int] = '1d', max_time=0, max_byte=0, max_file=0, console=True, encoding='utf8',
+    def logger_init(self, file_name, interval: Union[str, int] = '1d', max_time=0, max_byte=0, max_file=0, level=logging.INFO, console=logging.INFO, encoding='utf8',
                     formatter='%(asctime)s %(name)s %(filename)s [line:%(lineno)d] %(levelname)s: %(message)s'):
         """
         创建一个可以直接按照文件和日期来拆分的日志系统
@@ -173,7 +174,8 @@ class LoggerBase:
         :param max_time: 最多支持保存多少个间隔的时间。默认为0时，无论多久都不删除文件
         :param max_byte: 一个文件支持的最大大小。默认为0时，无论文件多大都不分文件
         :param max_file: 对多支持多少个log分文件。默认为0时，无论多少文件都不删除
-        :param console: 是否在std上打印
+        :param level: 日志上打印的等级
+        :param console: 是否在std上打印，输入console上打印的等级
         :param encoding: 打印格式
         :param formatter: 可以输入字符串，也可以直接传入 logging.Formatter
         """
@@ -181,55 +183,55 @@ class LoggerBase:
         if name in self._logger_instance:
             self._logger = self._logger_instance[name]
         else:
-            self._logger = logging.Logger(name)
-            self._logger_instance[name] = self
+            self._logger: logging.Logger = logging.Logger(name)
+            self._logger_instance[name] = self._logger
             log_format = logging.Formatter(formatter) if isinstance(formatter, str) else formatter
             time_handler = TimeSizeRotatingFileHandler(file_name, interval=interval, max_time=max_time, max_byte=max_byte, max_file=max_file, encoding=encoding)
             time_handler.setFormatter(log_format)
+            time_handler.setLevel(level)
             self._logger.addHandler(time_handler)
             if console:
                 console_handler = logging.StreamHandler()
                 console_handler.setFormatter(log_format)
-                console_handler.setLevel(logging.INFO)
+                console_handler.setLevel(console)
                 self._logger.addHandler(console_handler)
 
-    def print(self, *args, sep=' ', level: Union[str, int] = 'INFO', exc_info=False, **kwargs):
+    def print(self, *args, sep=' ', level: Union[str, int] = 'INFO', stacklevel=None, **kwargs):
         print_text = str(sep).join([str(_) for _ in args])
-        level_int = logging._nameToLevel.get(level, logging.INFO) if isinstance(level, str) else int(level)
-        stack_level = kwargs.get('stacklevel', 0)
-        stack_level += 2
-        kwargs['stacklevel'] = stack_level
-        self._logger.log(level=level_int, msg=print_text, exc_info=exc_info, **kwargs)
+        level_int = LogLevel(level).int
+        stack_level = 0 if stacklevel is None else int(stacklevel)
+        frame, frame_stack_level = STACK.get_frame(stack_level + 1, with_stack_level=True)
+        self._logger.log(level=level_int, msg=print_text, stacklevel=frame_stack_level, **kwargs)
 
-    def debug(self, *args, sep=' ', exc_info=False, **kwargs):
-        stack_level = kwargs.get('stacklevel', 0)
+    def trace(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
         stack_level += 1
-        kwargs['stacklevel'] = stack_level
-        self.print(*args, sep=sep, level=logging.DEBUG, exc_info=exc_info, **kwargs)
+        self.print(*args, sep=sep, level=logging.NOTSET, stacklevel=stack_level, **kwargs)
 
-    def info(self, *args, sep=' ', exc_info=False, **kwargs):
-        stack_level = kwargs.get('stacklevel', 0)
+    def debug(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
         stack_level += 1
-        kwargs['stacklevel'] = stack_level
-        self.print(*args, sep=sep, level=logging.INFO, exc_info=exc_info, **kwargs)
+        self.print(*args, sep=sep, level=logging.DEBUG, stacklevel=stack_level, **kwargs)
 
-    def warn(self, *args, sep=' ', exc_info=False, **kwargs):
-        stack_level = kwargs.get('stacklevel', 0)
+    def info(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
         stack_level += 1
-        kwargs['stacklevel'] = stack_level
-        self.print(*args, sep=sep, level=logging.WARNING, exc_info=exc_info, **kwargs)
+        self.print(*args, sep=sep, level=logging.INFO, stacklevel=stack_level, **kwargs)
 
-    def error(self, *args, sep=' ', exc_info=True, **kwargs):
-        stack_level = kwargs.get('stacklevel', 0)
+    def warn(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
         stack_level += 1
-        kwargs['stacklevel'] = stack_level
-        self.print(*args, sep=sep, level=logging.ERROR, exc_info=exc_info, **kwargs)
+        self.print(*args, sep=sep, level=logging.WARNING, stacklevel=stack_level, **kwargs)
 
-    def critical(self, *args, sep=' ', exc_info=True, **kwargs):
-        stack_level = kwargs.get('stacklevel', 0)
+    def error(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
         stack_level += 1
-        kwargs['stacklevel'] = stack_level
-        self.print(*args, sep=sep, level=logging.CRITICAL, exc_info=exc_info, **kwargs)
+        self.print(*args, sep=sep, level=logging.ERROR, stacklevel=stack_level, **kwargs)
+
+    def fatal(self, *args, sep=' ', **kwargs):
+        stack_level = kwargs.get('_stack_level', kwargs.get('_stacklevel', kwargs.get('stack_level', kwargs.get('stacklevel', 0))))
+        stack_level += 1
+        self.print(*args, sep=sep, level=logging.FATAL, stacklevel=stack_level, **kwargs)
 
     @classmethod
     def __class_getitem__(cls, item):
@@ -311,3 +313,128 @@ def function_log(process: bool = True, input_value: Union[bool, int] = True, ret
         return wrapper
 
     return dec
+
+
+class LogLevel:
+    TEXT = {
+        'TRACE': 0,
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'WARN': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL,
+        'FATAL': logging.FATAL,
+    }
+
+    def __init__(self, level: Union[str, int, 'LogLevel'], plus: bool = True):
+        plus_str = '+' if plus else ''
+        if isinstance(level, str):
+            if level.lower() in ['trace', 'debug', 'info', 'warn', 'warning', 'error', 'fatal', 'critical']:
+                self._int = self.TEXT[level]
+                self._str = level.upper()
+            else:
+                raise ValueError(f'invalid log level :"{level}"')
+        elif isinstance(level, int):
+            self._int = level
+            self._plus = ''
+            if level < 0:
+                raise ValueError(f'invalid log level :"{level}"')
+            elif level == 0:
+                self._str = 'TRACE'
+            elif level < logging.DEBUG:
+                self._str = 'TRACE'
+                self._plus = plus_str
+            elif level == logging.DEBUG:
+                self._str = 'DEBUG'
+            elif level < logging.INFO:
+                self._str = 'DEBUG'
+                self._plus = plus_str
+            elif level == logging.INFO:
+                self._str = 'INFO'
+            elif level < logging.WARN:
+                self._str = 'INFO'
+                self._plus = plus_str
+            elif level == logging.WARN:
+                self._str = 'WARN'
+            elif level < logging.ERROR:
+                self._str = 'WARN'
+                self._plus = plus_str
+            elif level == logging.ERROR:
+                self._str = 'ERROR'
+            elif level < logging.FATAL:
+                self._str = 'ERROR'
+                self._plus = plus_str
+            elif level == logging.FATAL:
+                self._str = 'FATAL'
+            else:
+                self._str = 'FATAL'
+                self._plus = plus_str
+        elif isinstance(level, LogLevel):
+            self._int = level._int
+            self._plus = level._plus
+            self._str = level._str
+
+    def __str__(self):
+        return self._str + self._plus
+
+    def __repr__(self):
+        return f'LogLevel({self._int})'
+
+    def __int__(self):
+        return self._int
+
+    def __eq__(self, other):
+        if isinstance(other, LogLevel):
+            return self._int == other._int
+        elif isinstance(other, str):
+            return self._int == LogLevel(other)._int
+        else:
+            return self._int == int(other)
+
+    def __lt__(self, other):
+        if isinstance(other, LogLevel):
+            return self._int < other._int
+        elif isinstance(other, str):
+            return self._int < LogLevel(other)._int
+        else:
+            return self._int < int(other)
+
+    def __gt__(self, other):
+        if isinstance(other, LogLevel):
+            return self._int > other._int
+        elif isinstance(other, str):
+            return self._int > LogLevel(other)._int
+        else:
+            return self._int > int(other)
+
+    def __le__(self, other):
+        if isinstance(other, LogLevel):
+            return self._int <= other._int
+        elif isinstance(other, str):
+            return self._int <= LogLevel(other)._int
+        else:
+            return self._int <= int(other)
+
+    def __ge__(self, other):
+        if isinstance(other, LogLevel):
+            return self._int >= other._int
+        elif isinstance(other, str):
+            return self._int >= LogLevel(other)._int
+        else:
+            return self._int >= int(other)
+
+    @property
+    def int(self):
+        return self._int
+
+    @property
+    def str(self):
+        return self._str
+
+    @property
+    def str_plus(self):
+        return self._str + self._plus
+
+
+STACK.this_file_lineno_should_ignore(308, check_text='re_value = func(self, *args, **kwargs)')

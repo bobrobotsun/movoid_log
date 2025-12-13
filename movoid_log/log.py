@@ -41,17 +41,30 @@ class LogWrite:
         self._folder_path = pathlib.Path(self._folder_name)
         self._file_date: Union[date, None] = None
         self._file: Union[TextIOWrapper, None] = None
-        self._level = 0
+        self._depth = 0
         self.init()
 
     def _flush_print(self, print_text: str):
         self.check_roll()
         self._file.write(str(print_text) + LOG_SPLIT)
         self._file.flush()
+        if self._file_date is None:
+            self._file_date = datetime.now().date()
         self.check_roll()
 
     def _fast_print(self, print_text: str):
         self._file.write(str(print_text) + LOG_SPLIT)
+
+    def _complete_text(self, time_str, style_str, log_text):
+        """
+        混合log文本
+        :param time_str: 时间的文本
+        :param style_str: 日志类型的文本
+        :param log_text: 实际日志文本
+        :return: 混合后的文本
+        """
+        depth_text = str(self._depth) if self._depth else ''
+        return MODULE_SPLIT.join([time_str, style_str, depth_text, log_text, '\n'])
 
     def log(self, *args, sep=' ', level='INFO', fast=False):
         log_text = str(sep).join([str(_) for _ in args])
@@ -60,14 +73,11 @@ class LogWrite:
             level_text = level
         else:
             level_text = 'INFO'
-
-        print_list = [str(self._level),
-                      datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-                      level_text,
-                      '',
-                      log_text,
-                      '\n']
-        print_text = MODULE_SPLIT.join(print_list)
+        print_text = self._complete_text(
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+            ELEMENT_SPLIT + level_text,
+            log_text
+        )
         if fast:
             self._fast_print(print_text)
         else:
@@ -85,8 +95,8 @@ class LogWrite:
                         part_txt = file_text.split(LOG_SPLIT, 2)[1]
                         if MODULE_SPLIT in part_txt:
                             text_list = part_txt.split(MODULE_SPLIT)
-                            if len(text_list) >= 2:
-                                time_module = text_list[1]
+                            if len(text_list) >= 1:
+                                time_module = text_list[0]
                                 time_date = datetime.strptime(time_module, "%Y-%m-%d %H:%M:%S.%f")
                                 self._file_date = time_date.date()
             except:
@@ -100,7 +110,7 @@ class LogWrite:
 
     def check_roll(self):
         should_roll = False
-        if self._file_date is not None and datetime.now().date() != self._file_date:
+        if self._file_date is not None and datetime.now().date() > self._file_date:
             should_roll = True
         else:
             if self._roll_size > 0:
@@ -124,6 +134,7 @@ class LogWrite:
         self._file_path = self._file_dir / (self._file_name + '.log')
         self._file_path.unlink(missing_ok=True)
         self._file = self._file_path.open('w')
+        self._file_date = None
         self._file.write(LOG_SPLIT)
         if self._max_day > 0:
             for log_path in self._folder_path.glob(f'{self._file_name}-????_??_??-*.log'):

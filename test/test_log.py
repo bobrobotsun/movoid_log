@@ -11,6 +11,6 @@ from movoid_log.log import LogWrite
 
 class Test_Log:
     def test_log(self):
-        log = LogWrite()
-        log.log(1, 2, 3, 4, 5)
-        log.log(1, 2, 3, 4, 5)
+        log = LogWrite(roll_size=1)
+        for i in range(10):
+            log.log(str(i) * 1000)

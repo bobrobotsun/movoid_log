@@ -7,4 +7,4 @@
 # Description   : 
 """
 from .log_old import Log, LogSub, LogElement, LogError
-from .logger import LoggerBase, TimeSizeRotatingFileHandler, function_log, LOG_PRINT_FORMAT
+from .logger import LoggerBase, TimeSizeRotatingFileHandler, function_log, LOG_PRINT_FORMAT, LogLevel
