@@ -103,7 +103,7 @@ class LogWrite:
                 self._file_date = None
         else:
             self._file_path.touch(exist_ok=True)
-        add_log = file_text[-1] != LOG_SPLIT
+        add_log = len(file_text) == 0 or file_text[-1] != LOG_SPLIT
         self._file = self._file_path.open('a')
         if add_log:
             self._file.write(LOG_SPLIT)
@@ -151,4 +151,3 @@ class LogWrite:
                 file_list.sort(key=lambda x: x[1], reverse=True)
                 for log_path, ctime in file_list[self._max_file:]:
                     log_path.unlink(missing_ok=True)
-
