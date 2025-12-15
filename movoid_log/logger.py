@@ -437,4 +437,4 @@ class LogLevel:
         return self._str + self._plus
 
 
-STACK.this_file_lineno_should_ignore(308, check_text='re_value = func(self, *args, **kwargs)')
+STACK.this_file_lineno_should_ignore(304, check_text='re_value = func(self, *args, **kwargs)')
