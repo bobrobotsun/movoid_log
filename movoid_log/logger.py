@@ -329,6 +329,9 @@ class LogLevel:
 
     def __init__(self, level: Union[str, int, 'LogLevel'], plus: bool = True):
         plus_str = '+' if plus else ''
+        self._int = 20
+        self._str = 'INFO'
+        self._plus = ''
         if isinstance(level, str):
             level_upper = level.upper()
             if level.lower() in ['trace', 'debug', 'info', 'warn', 'warning', 'error', 'fatal', 'critical']:
