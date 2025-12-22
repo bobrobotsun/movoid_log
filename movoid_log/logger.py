@@ -330,9 +330,10 @@ class LogLevel:
     def __init__(self, level: Union[str, int, 'LogLevel'], plus: bool = True):
         plus_str = '+' if plus else ''
         if isinstance(level, str):
+            level_upper = level.upper()
             if level.lower() in ['trace', 'debug', 'info', 'warn', 'warning', 'error', 'fatal', 'critical']:
-                self._int = self.TEXT[level]
-                self._str = level.upper()
+                self._int = self.TEXT[level_upper]
+                self._str = level_upper
             else:
                 raise ValueError(f'invalid log level :"{level}"')
         elif isinstance(level, int):
